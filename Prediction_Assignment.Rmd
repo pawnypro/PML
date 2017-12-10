@@ -1,0 +1,123 @@
+---
+title: "Human Activity Recognition - Weight Lifting Dataset"
+author: "Pawan Mishra"
+date: "12/9/2017"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+## Overview
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+We are provided with data from sensors on the belt, forearm, arm, and dumbell of 6 young health participants who were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+We now look at this data and focus on discriminating between different activities, i.e. try to predict "which" activity was performed at a specific point in time.
+
+## Downloading and exploring the data
+We download and read the given training and testing datasets
+```{r echo = FALSE}
+setwd("/Users/pawanmishra/Documents/datasciencecoursera/Practical Machine Learning")
+```
+```{r warning=FALSE}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", "pml-training.csv")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", "pml-testing.csv")
+```
+
+```{r warning=FALSE}
+training <- read.csv("pml-training.csv")
+testing <- read.csv("pml-testing.csv")
+```
+The training dataset contains 19622 observarions of 160 variables. Dealing with so many variables can be computationaly daunting and many also reduce interpretability of our analysis. Thus we create a new dataset (training1) with only the variables that represent the accelerometer, gyroscope and magnetometer readings of the belt, forearm, arm, and dumbell sensors along the x, y and z coordinates.
+All other variables are omitted because they seem to be derived in some form from these original sensor readings and we do not want to overfit our model.
+```{r warning=FALSE}
+# column 37-45: belt sensor; 60-68: arm sensor; 113-121: bumbell sensor; 151-159: forearm sensor
+# column 2: username; column 160: output class
+colnums <- c(2, 37:45, 60:68, 113:121, 151:159, 160)
+training1 <- training[, colnums]
+```
+Thus we will try to build a predictive model on the training1 dataset which contains 19622 observations of 38 variables: 37 predictors and 1 output "classe"
+
+## Splitting data for cross validation
+We will utilize the random sampling technique for splitting the training1 dataset into our actual training and testing datasets.
+```{r warning=FALSE}
+library("caret")
+set.seed(100)
+inTrain <- createDataPartition(y=training1$classe, p=0.75, list=FALSE)
+trainingSubset <- training1[inTrain,]
+testingSubset <- training1[-inTrain,]
+```
+So now our models will be built on the trainingSubset dataset and we will use the testingSubset for cross-validation.
+
+## Building a Predictive Model
+We will be fitting 3 different classification models to the trainingSubset dataset - random forest(rf), linear discriminant analysis(lda), and boosing with regression trees(gbm). We will evaluate the accuracy of all the three models through cross validation against the testingSubset dataset.
+We will also stack the three models up to come up with a stacked model and compare its accuracy with the other 3 models.
+Based on the accuracy we will select the best model for predicting the classe variable.
+
+## Random Forest
+```{r warning=FALSE}
+# Fitting Random Forest
+fitRF <- train(classe ~ ., data = trainingSubset, method = "rf")
+```
+We cross validate the model with testingSubset and find out the accuracy.
+```{r warning=FALSE}
+predRF <- predict(fitRF, testingSubset)
+```
+```{r warning=FALSE}
+confusionMatrix(predRF, testingSubset$classe)
+```
+We get an accuracy of 98.74% by this model.
+
+## Linear Discriminant Analysis
+```{r warning=FALSE}
+# Fitting Linear Discriminant Analysis
+fitLDA <- train(classe ~ ., data = trainingSubset, method = "lda")
+```
+We cross validate the model with testingSubset and find out the accuracy.
+```{r warning=FALSE}
+predLDA <- predict(fitLDA, testingSubset)
+```
+```{r warning=FALSE}
+confusionMatrix(predLDA, testingSubset$classe)
+```
+This model gives a significantly low accuracy of 66.29%.
+
+## Boosting with regression trees
+```{r warning=FALSE}
+# Fitting GBM
+fitGBM <- train(classe ~ ., data = trainingSubset, method = "gbm", verbose = FALSE)
+```
+We cross validate the model with testingSubset and find out the accuracy.
+```{r warning=FALSE}
+predGBM <- predict(fitGBM, testingSubset)
+```
+```{r warning=FALSE}
+confusionMatrix(predGBM, testingSubset$classe)
+```
+
+By this model we get an accuracy of 91.25% in the predictions.
+
+## Stacking up the models using random forest method
+```{r warning=FALSE}
+predDF <- data.frame(predRF, predLDA, predGBM, classe=testingSubset$classe)
+combModFit <- train(classe ~., method="rf", data=predDF) 
+combPred <- predict(combModFit,predDF)
+```
+```{r warning=FALSE}
+confusionMatrix(combPred, predDF$classe)
+```
+Stacking up the models gives us the same accuracy as random forest model i.e. 98.74%
+Thus based on the cross validated accuracies of all the models we find the Random Forest model to be the best one.
+
+## Predicting classe for given 20 test observations
+Thus we fit our Random Forest model to the given testing data and predict the classe for the 20 test observations. Through cross validation we estimate the accuracy of these predictions to be ~98.74%
+```{r warning=FALSE}
+# Applying model fitRF on testing dataset
+FinalPredRF <- predict(fitRF, testing)
+```
+```{r warning=FALSE}
+FinalPredRF
+```
+ 
+
+<End of Report>
+
+
